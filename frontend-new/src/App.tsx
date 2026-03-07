@@ -16,6 +16,14 @@ interface BackendRisk {
   reasons: string[];
 }
 
+interface SocialIntelligence {
+  daily_mentions: number;
+  mention_spike_pct: number;
+  bot_activity_pct: number;
+  detected_keywords: string[];
+  sentiment_label: string;
+}
+
 interface ChartPoint {
   date: string;
   price: number;
@@ -27,6 +35,7 @@ interface ProcessedData {
   metrics: BackendMetrics;
   risk: BackendRisk;
   chartData: ChartPoint[];
+  socialIntelligence: SocialIntelligence;
 }
 
 export default function App() {
@@ -65,7 +74,8 @@ export default function App() {
         ticker: data.ticker,
         metrics: data.metrics,
         risk: data.risk_assessment,
-        chartData: formattedChartData
+        chartData: formattedChartData,
+        socialIntelligence: data.social_intelligence
       });
 
       // Automatically hide home and show results
@@ -320,6 +330,39 @@ export default function App() {
               <div className="metric-value metric-number">{dashboardData.metrics.social_media_hype}/100</div>
               <div className="metric-description">Hype score</div>
             </div>
+          </div>
+
+          {/* Social Media Intelligence Section */}
+          <div className="card social-card">
+            <div className="metric-label social-label">Social Media Intelligence</div>
+            <div className="social-grid">
+              <div className="social-metric">
+                <div className="social-value">{dashboardData.socialIntelligence.daily_mentions}</div>
+                <div className="social-desc">Daily Mentions</div>
+              </div>
+              <div className="social-metric">
+                <div className="social-value">+{dashboardData.socialIntelligence.mention_spike_pct}%</div>
+                <div className="social-desc">Mention Spike</div>
+              </div>
+              <div className="social-metric">
+                <div className="social-value">{dashboardData.socialIntelligence.bot_activity_pct}%</div>
+                <div className="social-desc">Bot Activity</div>
+              </div>
+              <div className="social-metric">
+                <div className="social-value">{dashboardData.socialIntelligence.sentiment_label}</div>
+                <div className="social-desc">Sentiment</div>
+              </div>
+            </div>
+            {dashboardData.socialIntelligence.detected_keywords.length > 0 && (
+              <div className="keywords-section">
+                <div className="keywords-label">Detected Keywords:</div>
+                <div className="keywords-list">
+                  {dashboardData.socialIntelligence.detected_keywords.map((keyword, index) => (
+                    <span key={index} className="keyword-tag">{keyword}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Bottom Row: Charts & AI Reasons */}
