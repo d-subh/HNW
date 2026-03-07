@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AlertTriangle, TrendingUp, Activity, MessageSquare, ArrowRight, Shield, Zap, Brain, Lock } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Activity, MessageSquare, ArrowRight, Shield, Zap, Brain, Lock, Upload, AlertCircle, CheckCircle } from 'lucide-react';
 import './App.css';
 
 // --- TypeScript Interfaces for the FastAPI Backend Response ---
@@ -38,12 +38,42 @@ interface ProcessedData {
   socialIntelligence: SocialIntelligence;
 }
 
+interface ImageAnalysisResult {
+  file_name: string;
+  image_risk_score: number;
+  is_suspicious: boolean;
+  risk_level: string;
+  detected_manipulations: {
+    editing_artifacts: any;
+    fake_interface: any;
+    chart_tampering: any;
+    inconsistencies: any;
+  };
+  suspicious_findings: Array<{
+    category: string;
+    issue: string;
+    confidence: number;
+  }>;
+  summary: {
+    total_issues_found: number;
+    highest_risk_category: string;
+  };
+}
+
 export default function App() {
   const [tickerInput, setTickerInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<ProcessedData | null>(null);
   const [showHome, setShowHome] = useState<boolean>(true);
+  
+  // Image analysis states
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageAnalysis, setImageAnalysis] = useState<ImageAnalysisResult | null>(null);
+  const [imageLoading, setImageLoading] = useState<boolean>(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [showImageAnalysis, setShowImageAnalysis] = useState<boolean>(false);
 
   const fetchStockAnalysis = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +122,61 @@ export default function App() {
     if (score >= 70) return 'risk-high';
     if (score >= 40) return 'risk-medium';
     return 'risk-low';
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImagePreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+      setImageError(null);
+    }
+  };
+
+  const analyzeImage = async () => {
+    if (!imageFile) {
+      setImageError('Please select an image first');
+      return;
+    }
+
+    setImageLoading(true);
+    setImageError(null);
+    setImageAnalysis(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', imageFile);
+
+      const response = await fetch('http://127.0.0.1:8000/analyze-image', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to analyze image');
+      }
+
+      const data: ImageAnalysisResult = await response.json();
+      setImageAnalysis(data);
+      setShowImageAnalysis(true);
+    } catch (err: any) {
+      setImageError(err.message || 'Failed to analyze image');
+    } finally {
+      setImageLoading(false);
+    }
+  };
+
+  const resetImageAnalysis = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setImageAnalysis(null);
+    setImageError(null);
+    setShowImageAnalysis(false);
   };
 
   // Home page with animated hero section
@@ -229,6 +314,111 @@ export default function App() {
               <p>Comprehensive analysis with actionable insights for informed investment decisions</p>
             </div>
           </div>
+        </div>
+
+        {/* Image Analysis Section */}
+        <div className="image-analysis-section">
+          <h2 className="section-title">Detect Fake Profit Screenshots</h2>
+          
+          {!showImageAnalysis ? (
+            <div className="image-upload-container">
+              <div className="upload-area">
+                <input
+                  type="file"
+                  id="image-input"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  style={{ display: 'none' }}
+                />
+                <label htmlFor="image-input" className="upload-label">
+                  <Upload size={48} />
+                  <h3>Upload Image to Analyze</h3>
+                  <p>Our AI checks for edited screenshots, fake trading interfaces, and manipulated charts</p>
+                  <button type="button" className="upload-btn">
+                    Select Image
+                  </button>
+                </label>
+              </div>
+
+              {imagePreview && (
+                <div className="image-preview-section">
+                  <div className="preview-image">
+                    <img src={imagePreview} alt="Preview" />
+                  </div>
+                  <div className="image-actions">
+                    <button className="analyze-btn" onClick={analyzeImage} disabled={imageLoading}>
+                      {imageLoading ? (
+                        <>
+                          <span className="spinner"></span>
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          Analyze Image
+                          <Zap size={18} />
+                        </>
+                      )}
+                    </button>
+                    <button className="reset-btn" onClick={resetImageAnalysis}>
+                      Choose Different Image
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {imageError && <div className="image-error">{imageError}</div>}
+            </div>
+          ) : imageAnalysis ? (
+            <div className="image-results-container fade-in">
+              <div className={`image-result-header ${imageAnalysis.risk_level.toLowerCase()}`}>
+                <div className="risk-indicator">
+                  {imageAnalysis.is_suspicious ? (
+                    <AlertCircle size={32} />
+                  ) : (
+                    <CheckCircle size={32} />
+                  )}
+                </div>
+                <div className="risk-info">
+                  <h3>Risk Level: {imageAnalysis.risk_level}</h3>
+                  <p>Image Risk Score: {imageAnalysis.image_risk_score}%</p>
+                </div>
+              </div>
+
+              {imageAnalysis.suspicious_findings && imageAnalysis.suspicious_findings.length > 0 && (
+                <div className="findings-section">
+                  <h4>Detected Issues ({imageAnalysis.summary.total_issues_found})</h4>
+                  <div className="findings-list">
+                    {imageAnalysis.suspicious_findings.map((finding, idx) => (
+                      <div key={idx} className="finding-item">
+                        <AlertTriangle size={18} className="finding-icon" />
+                        <div className="finding-content">
+                          <strong>{finding.category}</strong>
+                          <p>{finding.issue}</p>
+                          <div className="confidence-bar">
+                            <div 
+                              className="confidence-fill" 
+                              style={{ width: `${finding.confidence * 100}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!imageAnalysis.is_suspicious && (
+                <div className="no-issues-found">
+                  <CheckCircle size={48} />
+                  <p>No suspicious patterns detected in this image</p>
+                </div>
+              )}
+
+              <button className="analyze-another-btn" onClick={resetImageAnalysis}>
+                Analyze Another Image
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {/* How It Works */}

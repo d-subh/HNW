@@ -6,3 +6,7 @@ scikit-learn
 numpy
 vaderSentiment
 requests
+opencv-python
+pillow
+python-multipart
+
